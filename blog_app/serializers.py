@@ -7,11 +7,6 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'username']
 
-class TagSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Tag
-        fields = ['id', 'name']
-
 class CommentSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     replies = serializers.SerializerMethodField()
@@ -25,25 +20,29 @@ class CommentSerializer(serializers.ModelSerializer):
         serializer = CommentSerializer(replies, many=True)
         return serializer.data
 
+class TagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Tag
+        fields = ['id', 'name']
+
+
 class PostSerializer(serializers.ModelSerializer):
     author = UserSerializer(read_only=True)
     comments = CommentSerializer(many=True, read_only=True)
     likes_count = serializers.SerializerMethodField()
     tags = TagSerializer(many=True, read_only=True)
-    tag_ids = serializers.PrimaryKeyRelatedField(
-        many=True,
-        queryset=Tag.objects.all(),
-        source='tags',
-        write_only=True
-    )
     
     class Meta:
         model = Post
         fields = ['id', 'title', 'content', 'author', 'created_at', 'updated_at', 
-                 'is_published', 'tags', 'tag_ids', 'comments', 'likes_count']
+                 'is_published', 'tags', 'comments', 'likes_count']
+        extra_kwargs = {
+            'author': {'read_only': True},
+        }
     
     def get_likes_count(self, obj):
         return obj.likes.count()
+    
 
 class LikeSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)

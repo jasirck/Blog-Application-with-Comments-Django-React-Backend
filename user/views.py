@@ -28,15 +28,10 @@ class LoginAPIView(APIView):
         
         if user is not None:
             refresh = RefreshToken.for_user(user)
-            tokens = {
-                'refresh': str(refresh),
-                'access': str(refresh.access_token),
-            }
-            
-            serializer = UserSerializer(user)
             return Response({
-                'user': serializer.data,
-                'tokens': tokens
+                'user': username,
+                'refresh_token': str(refresh),
+                'access_token': str(refresh.access_token)
             })
         
         return Response(
