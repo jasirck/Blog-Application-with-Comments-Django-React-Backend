@@ -13,19 +13,20 @@ class PostListCreateView(APIView):
     permission_classes = [IsAuthenticated]
     
     def get(self, request):
-        queryset = Post.objects.filter(is_deleted=False)
+        queryset = Post.objects.filter(is_deleted=False).select_related('author').prefetch_related('tags')
         
-        author_id = request.query_params.get('author')
-        if author_id:
-            queryset = queryset.filter(author_id=author_id)
+        author = request.query_params.get('author')
+        if author:
+            queryset = queryset.filter(author__username=author)
             
         is_published = request.query_params.get('is_published')
         if is_published:
             queryset = queryset.filter(is_published=is_published.lower() == 'true')
             
-        tags = request.query_params.getlist('tags')
+        tags = request.query_params.get('tags')
         if tags:
-            queryset = queryset.filter(tags__id__in=tags).distinct()
+            tag_ids = tags.split(',')
+            queryset = queryset.filter(tags__id__in=tag_ids).distinct()
         
         search = request.query_params.get('search')
         if search:
@@ -33,6 +34,19 @@ class PostListCreateView(APIView):
                 models.Q(title__icontains=search) | 
                 models.Q(content__icontains=search)
             )
+            
+        queryset = queryset.annotate(
+            likes_count=models.Count('likes', distinct=True),
+            comments_count=models.Count('comments', distinct=True)
+        )
+        
+        sort_option = request.query_params.get('sort', 'newest')
+        if sort_option == 'newest':
+            queryset = queryset.order_by('-created_at')
+        elif sort_option == 'oldest':
+            queryset = queryset.order_by('created_at')
+        elif sort_option == 'popular':
+            queryset = queryset.order_by('-likes_count')
             
         serializer = PostSerializer(queryset, many=True)
         return Response(serializer.data)
