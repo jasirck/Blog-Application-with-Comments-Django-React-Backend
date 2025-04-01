@@ -140,7 +140,7 @@ class CommentListCreateView(APIView):
             )
             
         comments = Comment.objects.filter(post=post, parent__isnull=True)
-        serializer = CommentSerializer(comments, many=True)
+        serializer = CommentSerializer(comments, many=True, context={'request': request})
         return Response(serializer.data)
     
     def post(self, request, post_id):
@@ -151,11 +151,69 @@ class CommentListCreateView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
             
-        serializer = CommentSerializer(data=request.data)
+        serializer = CommentSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             serializer.save(user=request.user, post=post)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class CommentDetailView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    
+    def get_object(self, comment_id):
+        try:
+            return Comment.objects.get(pk=comment_id)
+        except Comment.DoesNotExist:
+            return None
+    
+    def get(self, request, comment_id):
+        comment = self.get_object(comment_id)
+        if not comment:
+            return Response(
+                {'detail': 'Comment not found.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+            
+        serializer = CommentSerializer(comment, context={'request': request})
+        return Response(serializer.data)
+    
+    def put(self, request, comment_id):
+        comment = self.get_object(comment_id)
+        if not comment:
+            return Response(
+                {'detail': 'Comment not found.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+            
+        if comment.user != request.user:
+            return Response(
+                {'detail': 'You do not have permission to perform this action.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+            
+        serializer = CommentSerializer(comment, data=request.data, partial=True, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def delete(self, request, comment_id):
+        comment = self.get_object(comment_id)
+        if not comment:
+            return Response(
+                {'detail': 'Comment not found.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+            
+        if comment.user != request.user:
+            return Response(
+                {'detail': 'You do not have permission to perform this action.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+            
+        comment.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 class ReplyCreateView(APIView):
     authentication_classes = [JWTAuthentication]

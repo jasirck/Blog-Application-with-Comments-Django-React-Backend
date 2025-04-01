@@ -10,15 +10,23 @@ class UserSerializer(serializers.ModelSerializer):
 class CommentSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     replies = serializers.SerializerMethodField()
+    can_edit = serializers.SerializerMethodField()
     
     class Meta:
         model = Comment
-        fields = ['id', 'user', 'content', 'created_at', 'parent', 'replies']
+        fields = ['id', 'user', 'content', 'created_at', 'updated_at', 'parent', 'replies', 'can_edit']
+        read_only_fields = ['user', 'created_at', 'updated_at', 'parent', 'replies']
     
     def get_replies(self, obj):
-        replies = Comment.objects.filter(parent=obj)
+        replies = Comment.objects.filter(parent=obj).order_by('created_at')
         serializer = CommentSerializer(replies, many=True)
         return serializer.data
+    
+    def get_can_edit(self, obj):
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            return obj.user == request.user
+        return False
 
 class TagSerializer(serializers.ModelSerializer):
     class Meta:
